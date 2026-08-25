@@ -1,5 +1,5 @@
 public import Foundation
-import InfraKit
+public import InfraKit
 
 /// The closed flag is guarded by Locked; FileHandle is Sendable on these platforms.
 public struct FileSink: ~Copyable, Sendable {

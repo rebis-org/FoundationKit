@@ -31,6 +31,12 @@ let package = Package(
         .library(name: "ErrKit", targets: ["ErrKit"]),
         .library(name: "PathKit", targets: ["PathKit"]),
         .library(name: "FileKit", targets: ["FileKit"]),
+        .library(name: "WindowKit", targets: ["WindowKit"]),
+    ],
+    traits: [
+        .trait(
+            name: "OpenSwiftUI",
+        ),
     ],
     dependencies: [
         .package(
@@ -38,6 +44,9 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.5.0",
+        ),
+        .package(
+            url: "https://github.com/OpenSwiftUIProject/OpenSwiftUI-spm.git", from: "0.20.1",
         ),
     ],
     targets: [
@@ -69,6 +78,20 @@ let package = Package(
         .target(
             name: "FileKit",
             dependencies: ["InfraKit", "PathKit", "LogKit", "ErrKit"],
+            swiftSettings: Constants.swiftSettings,
+        ),
+        .target(
+            name: "WindowKit",
+            dependencies: [
+                "InfraKit",
+                "LogKit",
+                "ErrKit",
+                .product(
+                    name: "OpenSwiftUI",
+                    package: "OpenSwiftUI-spm",
+                    condition: .when(traits: ["OpenSwiftUI"]),
+                ),
+            ],
             swiftSettings: Constants.swiftSettings,
         ),
         .macro(
