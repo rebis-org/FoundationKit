@@ -158,6 +158,8 @@ public final class Watch: Sendable {
             itemKind: .directory,
         )
 
+        guard option.predicate.matches(event.url) else { return }
+
         let continuations = state.withLock { state in
             Array(state.eventContinuations.values)
         }

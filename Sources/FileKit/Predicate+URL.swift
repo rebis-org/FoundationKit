@@ -38,6 +38,36 @@ public extension InfraKit.Predicate where A == URL {
         }
     }
 
+    static func fileName(startingWith prefix: String) -> Self {
+        Self { url in
+            url.lastPathComponent.starts(with: prefix)
+        }
+    }
+
+    static func fileName(endingWith suffix: String) -> Self {
+        Self { url in
+            url.lastPathComponent.hasSuffix(suffix)
+        }
+    }
+
+    static func fileName(containing substring: String) -> Self {
+        Self { url in
+            url.lastPathComponent.contains(substring)
+        }
+    }
+
+    static func fileName(localizedStandardContaining substring: String) -> Self {
+        Self { url in
+            url.lastPathComponent.localizedStandardContains(substring)
+        }
+    }
+
+    static func fileName(localizedCaseInsensitiveContaining substring: String) -> Self {
+        Self { url in
+            url.lastPathComponent.localizedCaseInsensitiveContains(substring)
+        }
+    }
+
     static func fileSize(_ range: ClosedRange<Int>) -> Self {
         Self { url in
             guard let size = try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize else {

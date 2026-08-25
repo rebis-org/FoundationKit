@@ -312,6 +312,8 @@ public final class RecursiveWatch: Sendable {
     }
 
     func emitEvent(_ event: FileSystemEvent) {
+        guard option.predicate.matches(event.url) else { return }
+
         let continuations = state.withLock { state in
             Array(state.eventContinuations.values)
         }
