@@ -13,8 +13,6 @@ public final class RecursiveWatch: Sendable {
 
     private struct State: Sendable {
         var isStarted = false
-        var eventContinuations: [UUID: AsyncStream<FileSystemEvent>.Continuation] = [:]
-        var errorContinuations: [UUID: AsyncStream<FileSystemError>.Continuation] = [:]
         var watchers: [URL: Watch] = [:]
         var tooManyWatchersReported = false
         #if os(macOS)
@@ -23,6 +21,8 @@ public final class RecursiveWatch: Sendable {
     }
 
     private let state: Locked<State>
+    private let eventHub = StreamHub<FileSystemEvent>()
+    private let errorHub = StreamHub<FileSystemError>()
 
     public init(
         url: URL,
@@ -34,7 +34,7 @@ public final class RecursiveWatch: Sendable {
             throw FileSystemError.directoryNotFound(url)
         }
         guard values?.isDirectory == true else {
-            throw FileSystemError.invalidConfiguration("The URL is not a directory: \(url.path)")
+            throw FileSystemError.invalidConfiguration("url is not a directory: '\(url.path)'")
         }
 
         rootURL = url
@@ -48,37 +48,11 @@ public final class RecursiveWatch: Sendable {
     }
 
     public var events: AsyncStream<FileSystemEvent> {
-        AsyncStream { continuation in
-            let id = UUID()
-
-            self.state.withLock { state in
-                state.eventContinuations[id] = continuation
-            }
-
-            continuation.onTermination = { [weak self] _ in
-                guard let self else { return }
-                state.withLock { state in
-                    _ = state.eventContinuations.removeValue(forKey: id)
-                }
-            }
-        }
+        eventHub.stream
     }
 
     public var errors: AsyncStream<FileSystemError> {
-        AsyncStream { continuation in
-            let id = UUID()
-
-            self.state.withLock { state in
-                state.errorContinuations[id] = continuation
-            }
-
-            continuation.onTermination = { [weak self] _ in
-                guard let self else { return }
-                state.withLock { state in
-                    _ = state.errorContinuations.removeValue(forKey: id)
-                }
-            }
-        }
+        errorHub.stream
     }
 
     @unsafe
@@ -100,17 +74,13 @@ public final class RecursiveWatch: Sendable {
 
     public func stop() {
         #if os(macOS)
-            let (watchers, backend, eventContinuations, errorContinuations) = state.withLock { state in
+            let (watchers, backend) = state.withLock { state in
                 state.isStarted = false
                 let watchers = state.watchers
                 state.watchers.removeAll()
                 let backend = state.fseventsBackend
                 state.fseventsBackend = nil
-                let eventContinuations = state.eventContinuations
-                let errorContinuations = state.errorContinuations
-                state.eventContinuations.removeAll()
-                state.errorContinuations.removeAll()
-                return (watchers, backend, eventContinuations, errorContinuations)
+                return (watchers, backend)
             }
 
             for watcher in watchers.values {
@@ -119,15 +89,11 @@ public final class RecursiveWatch: Sendable {
 
             backend?.stop()
         #else
-            let (watchers, eventContinuations, errorContinuations) = state.withLock { state in
+            let watchers = state.withLock { state in
                 state.isStarted = false
                 let watchers = state.watchers
                 state.watchers.removeAll()
-                let eventContinuations = state.eventContinuations
-                let errorContinuations = state.errorContinuations
-                state.eventContinuations.removeAll()
-                state.errorContinuations.removeAll()
-                return (watchers, eventContinuations, errorContinuations)
+                return watchers
             }
 
             for watcher in watchers.values {
@@ -135,12 +101,8 @@ public final class RecursiveWatch: Sendable {
             }
         #endif
 
-        for continuation in eventContinuations.values {
-            continuation.finish()
-        }
-        for continuation in errorContinuations.values {
-            continuation.finish()
-        }
+        eventHub.finish()
+        errorHub.finish()
     }
 
     @unsafe
@@ -197,7 +159,7 @@ public final class RecursiveWatch: Sendable {
             #else
                 emitError(
                     .invalidConfiguration(
-                        "FSEvents is available only on macOS. DispatchSource is used instead.",
+                        "fsevents backend is available only on macOS; dispatch source is used instead",
                     ),
                 )
                 return .dispatchSource
@@ -313,33 +275,10 @@ public final class RecursiveWatch: Sendable {
 
     func emitEvent(_ event: FileSystemEvent) {
         guard option.predicate.matches(event.url) else { return }
-
-        let continuations = state.withLock { state in
-            Array(state.eventContinuations.values)
-        }
-
-        for continuation in continuations {
-            continuation.yield(event)
-        }
+        eventHub.yield(event)
     }
 
     func emitError(_ error: FileSystemError) {
-        let continuations = state.withLock { state in
-            Array(state.errorContinuations.values)
-        }
-
-        for continuation in continuations {
-            continuation.yield(error)
-        }
-    }
-
-    private func matchesGlobPattern(name: String, pattern: String) -> Bool {
-        var regexPattern =
-            pattern
-                .replacingOccurrences(of: ".", with: "\\.")
-                .replacingOccurrences(of: "*", with: ".*")
-                .replacingOccurrences(of: "?", with: ".")
-        regexPattern = "^" + regexPattern + "$"
-        return name.range(of: regexPattern, options: .regularExpression) != nil
+        errorHub.yield(error)
     }
 }

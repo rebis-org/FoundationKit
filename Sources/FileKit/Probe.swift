@@ -34,53 +34,42 @@ public struct Probe: Sequence {
         ProbeIterator(probe: self)
     }
 
-    public func depth(max: Int) -> Self {
+    private func with(
+        depth: ClosedRange<Int>? = nil, types: Set<EntryType>? = nil,
+        extensions: Set<String>? = nil, hidden: Bool? = nil,
+    ) -> Self {
         Self(
-            root: root, volume: volume, depth: Swift.min(max, depth.lowerBound) ... max, types: types,
-            extensions: extensions, hidden: hidden,
+            root: root, volume: volume, depth: depth ?? self.depth, types: types ?? self.types,
+            extensions: extensions ?? self.extensions, hidden: hidden ?? self.hidden,
         )
+    }
+
+    public func depth(max: Int) -> Self {
+        with(depth: Swift.min(max, depth.lowerBound) ... max)
     }
 
     public func depth(min: Int) -> Self {
-        Self(
-            root: root, volume: volume, depth: min ... Swift.max(depth.upperBound, min), types: types,
-            extensions: extensions, hidden: hidden,
-        )
+        with(depth: min ... Swift.max(depth.upperBound, min))
     }
 
     public func depth(_ range: Range<Int>) -> Self {
-        Self(
-            root: root, volume: volume, depth: range.lowerBound ... (range.upperBound - 1), types: types,
-            extensions: extensions, hidden: hidden,
-        )
+        with(depth: range.lowerBound ... (range.upperBound - 1))
     }
 
     public func depth(_ range: ClosedRange<Int>) -> Self {
-        Self(
-            root: root, volume: volume, depth: range, types: types, extensions: extensions, hidden: hidden,
-        )
+        with(depth: range)
     }
 
     public func type(_ type: EntryType) -> Self {
-        var types = types
-        types.insert(type)
-        return Self(
-            root: root, volume: volume, depth: depth, types: types, extensions: extensions, hidden: hidden,
-        )
+        with(types: types.union([type]))
     }
 
     public func `extension`(_ fileExtension: String) -> Self {
-        var extensions = extensions
-        extensions.insert(fileExtension)
-        return Self(
-            root: root, volume: volume, depth: depth, types: types, extensions: extensions, hidden: hidden,
-        )
+        with(extensions: extensions.union([fileExtension]))
     }
 
     public func hidden(_ hidden: Bool) -> Self {
-        Self(
-            root: root, volume: volume, depth: depth, types: types, extensions: extensions, hidden: hidden,
-        )
+        with(hidden: hidden)
     }
 
     public enum ControlFlow {
@@ -125,7 +114,9 @@ public struct ProbeIterator: IteratorProtocol {
                 }
                 continue
             }
-            if let type = probe.volume.type(at: path), !probe.types.isEmpty, !probe.types.contains(type) {
+            if !probe.types.isEmpty, let type = probe.volume.type(at: path),
+               !probe.types.contains(type)
+            {
                 continue
             }
             if !probe.extensions.isEmpty, !probe.extensions.contains(path.extension) {

@@ -25,10 +25,7 @@ public extension Node where Kind == FileKind {
     }
 
     func write(_ string: String, encoding: String.Encoding = .utf8) throws {
-        guard let data = string.data(using: encoding) else {
-            throw FileSystemError.stringEncodingFailed(string)
-        }
-        try write(data)
+        try write(encoded(string, encoding: encoding))
     }
 
     func append(_ data: Data) throws {
@@ -38,10 +35,14 @@ public extension Node where Kind == FileKind {
     }
 
     func append(_ string: String, encoding: String.Encoding = .utf8) throws {
+        try append(encoded(string, encoding: encoding))
+    }
+
+    private func encoded(_ string: String, encoding: String.Encoding) throws -> Data {
         guard let data = string.data(using: encoding) else {
             throw FileSystemError.stringEncodingFailed(string)
         }
-        try append(data)
+        return data
     }
 }
 

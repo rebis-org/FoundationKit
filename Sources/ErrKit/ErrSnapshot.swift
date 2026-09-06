@@ -53,7 +53,15 @@ extension ErrSnapshot {
     }
 
     public var signature: String {
-        String(sha256(typeChain).prefix(6))
+        // Only the first 3 digest bytes are shown, so only they are hexed.
+        // Output is identical to hexing all 32 bytes and taking prefix(6).
+        var result = ""
+        result.reserveCapacity(6)
+        for byte in SHA256.hash(data: Data(typeChain.utf8)).prefix(3) {
+            result.append(hexNibble(byte >> 4))
+            result.append(hexNibble(byte & 0x0F))
+        }
+        return result
     }
 
     private var snapshots: [ErrSnapshot] {
@@ -76,8 +84,6 @@ extension ErrSnapshot {
     }
 }
 
-private func sha256(_ string: String) -> String {
-    SHA256.hash(data: Data(string.utf8))
-        .map { String($0 >> 4, radix: 16) + String($0 & 0x0F, radix: 16) }
-        .joined()
+private func hexNibble(_ nibble: UInt8) -> Character {
+    Character(UnicodeScalar(nibble < 10 ? 48 + nibble : 87 + nibble))
 }

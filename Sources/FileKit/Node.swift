@@ -54,8 +54,7 @@ public extension Node {
     }
 
     var nameExcludingExtension: String {
-        let components = name.split(separator: ".")
-        return components.count > 1 ? components.dropLast().joined() : name
+        path.baseName(dropExtension: true)
     }
 
     var parent: Directory? {

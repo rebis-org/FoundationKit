@@ -9,12 +9,12 @@ public final class Watch: Sendable {
     private struct State: @unchecked Sendable {
         var fileDescriptor: Int32 = -1
         var source: (any DispatchSourceFileSystemObject)?
-        var eventContinuations: [UUID: AsyncStream<FileSystemEvent>.Continuation] = [:]
-        var errorContinuations: [UUID: AsyncStream<FileSystemError>.Continuation] = [:]
         var pendingWorkItem: DispatchWorkItem?
     }
 
     private let state: Locked<State>
+    private let eventHub = StreamHub<FileSystemEvent>()
+    private let errorHub = StreamHub<FileSystemError>()
 
     public init(url: URL, option: WatcherOption = WatcherOption()) throws {
         let values = try? url.resourceValues(forKeys: [.isDirectoryKey])
@@ -22,7 +22,7 @@ public final class Watch: Sendable {
             throw FileSystemError.directoryNotFound(url)
         }
         guard values?.isDirectory == true else {
-            throw FileSystemError.invalidConfiguration("The URL is not a directory: \(url.path)")
+            throw FileSystemError.invalidConfiguration("url is not a directory: '\(url.path)'")
         }
 
         self.url = url
@@ -35,37 +35,11 @@ public final class Watch: Sendable {
     }
 
     public var events: AsyncStream<FileSystemEvent> {
-        AsyncStream { continuation in
-            let id = UUID()
-
-            self.state.withLock { state in
-                state.eventContinuations[id] = continuation
-            }
-
-            continuation.onTermination = { [weak self] _ in
-                guard let self else { return }
-                state.withLock { state in
-                    _ = state.eventContinuations.removeValue(forKey: id)
-                }
-            }
-        }
+        eventHub.stream
     }
 
     public var errors: AsyncStream<FileSystemError> {
-        AsyncStream { continuation in
-            let id = UUID()
-
-            self.state.withLock { state in
-                state.errorContinuations[id] = continuation
-            }
-
-            continuation.onTermination = { [weak self] _ in
-                guard let self else { return }
-                state.withLock { state in
-                    _ = state.errorContinuations.removeValue(forKey: id)
-                }
-            }
-        }
+        errorHub.stream
     }
 
     @unsafe
@@ -112,27 +86,18 @@ public final class Watch: Sendable {
     }
 
     public func stop() {
-        let (source, eventContinuations, errorContinuations) = state.withLock { state in
+        let source = state.withLock { state in
             state.pendingWorkItem?.cancel()
             state.pendingWorkItem = nil
             let source = state.source
             state.source = nil
             state.fileDescriptor = -1
-            let eventContinuations = state.eventContinuations
-            let errorContinuations = state.errorContinuations
-            state.eventContinuations.removeAll()
-            state.errorContinuations.removeAll()
-            return (source, eventContinuations, errorContinuations)
+            return source
         }
 
         source?.cancel()
-
-        for continuation in eventContinuations.values {
-            continuation.finish()
-        }
-        for continuation in errorContinuations.values {
-            continuation.finish()
-        }
+        eventHub.finish()
+        errorHub.finish()
     }
 
     private func handleEvent() {
@@ -159,23 +124,10 @@ public final class Watch: Sendable {
         )
 
         guard option.predicate.matches(event.url) else { return }
-
-        let continuations = state.withLock { state in
-            Array(state.eventContinuations.values)
-        }
-
-        for continuation in continuations {
-            continuation.yield(event)
-        }
+        eventHub.yield(event)
     }
 
     private func emitError(_ error: FileSystemError) {
-        let continuations = state.withLock { state in
-            Array(state.errorContinuations.values)
-        }
-
-        for continuation in continuations {
-            continuation.yield(error)
-        }
+        errorHub.yield(error)
     }
 }

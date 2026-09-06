@@ -4,14 +4,25 @@ public import UniformTypeIdentifiers
 
 public extension InfraKit.Predicate where A == URL {
     static func fileExtensions(_ extensions: [String]) -> Self {
-        Self { url in
-            extensions.contains(url.pathExtension.lowercased())
-        }
+        let set = Set(extensions.map { $0.lowercased() })
+        return Self { set.contains($0.pathExtension.lowercased()) }
     }
+
+    private static let utTypeCache = Locked([String: UTType?]())
 
     static func utTypes(_ types: [UTType]) -> Self {
         Self { url in
-            guard let fileType = UTType(filenameExtension: url.pathExtension) else { return false }
+            let ext = url.pathExtension
+            guard
+                let fileType = utTypeCache.withLock({ cache -> UTType? in
+                    if let cached = cache[ext] {
+                        return cached
+                    }
+                    let resolved = UTType(filenameExtension: ext)
+                    cache[ext] = resolved
+                    return resolved
+                })
+            else { return false }
             return types.contains { $0.conforms(to: fileType) || fileType.conforms(to: $0) }
         }
     }
@@ -33,39 +44,37 @@ public extension InfraKit.Predicate where A == URL {
     }
 
     static func fileName(matching pattern: String) -> Self {
-        Self { url in
-            url.lastPathComponent.range(of: pattern, options: .regularExpression) != nil
+        // Compiled once here instead of per evaluation; an invalid
+        // pattern never matches, matching range(of:.regularExpression).
+        let compiled = try? NSRegularExpression(pattern: pattern)
+        return fileName { name in
+            guard let compiled else { return false }
+            return compiled.firstMatch(in: name, range: NSRange(name.startIndex..., in: name)) != nil
         }
     }
 
     static func fileName(startingWith prefix: String) -> Self {
-        Self { url in
-            url.lastPathComponent.starts(with: prefix)
-        }
+        fileName { $0.starts(with: prefix) }
     }
 
     static func fileName(endingWith suffix: String) -> Self {
-        Self { url in
-            url.lastPathComponent.hasSuffix(suffix)
-        }
+        fileName { $0.hasSuffix(suffix) }
     }
 
     static func fileName(containing substring: String) -> Self {
-        Self { url in
-            url.lastPathComponent.contains(substring)
-        }
+        fileName { $0.contains(substring) }
     }
 
     static func fileName(localizedStandardContaining substring: String) -> Self {
-        Self { url in
-            url.lastPathComponent.localizedStandardContains(substring)
-        }
+        fileName { $0.localizedStandardContains(substring) }
     }
 
     static func fileName(localizedCaseInsensitiveContaining substring: String) -> Self {
-        Self { url in
-            url.lastPathComponent.localizedCaseInsensitiveContains(substring)
-        }
+        fileName { $0.localizedCaseInsensitiveContains(substring) }
+    }
+
+    private static func fileName(where test: @escaping @Sendable (String) -> Bool) -> Self {
+        Self { test($0.lastPathComponent) }
     }
 
     static func fileSize(_ range: ClosedRange<Int>) -> Self {
@@ -90,14 +99,14 @@ public extension InfraKit.Predicate where A == URL {
     }
 
     static var directory: Self {
-        Self { url in
-            (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
-        }
+        Self { isDirectory($0) == true }
     }
 
     static var file: Self {
-        Self { url in
-            (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == false
-        }
+        Self { isDirectory($0) == false }
+    }
+
+    private static func isDirectory(_ url: URL) -> Bool? {
+        try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory
     }
 }

@@ -14,9 +14,7 @@ extension Path: Codable {
         let value = try decoder.singleValueContainer().decode(String.self)
         if value.hasPrefix("/") {
             string = value
-        } else if let root = decoder.userInfo[.relativePath] as? Path {
-            string = (root / value).string
-        } else if let root = decoder.userInfo[.relativePath] as? DynamicPath {
+        } else if let root = Self.relativeRoot(from: decoder.userInfo) {
             string = (root / value).string
         } else {
             throw DecodingError.dataCorrupted(
@@ -30,12 +28,15 @@ extension Path: Codable {
 
     public func encode(to encoder: any Encoder) throws {
         var container = encoder.singleValueContainer()
-        if let root = encoder.userInfo[.relativePath] as? Path {
-            try container.encode(relative(to: root))
-        } else if let root = encoder.userInfo[.relativePath] as? DynamicPath {
+        if let root = Self.relativeRoot(from: encoder.userInfo) {
             try container.encode(relative(to: root))
         } else {
             try container.encode(string)
         }
+    }
+
+    private static func relativeRoot(from userInfo: [CodingUserInfoKey: Any]) -> Path? {
+        (userInfo[.relativePath] as? Path)
+            ?? (userInfo[.relativePath] as? DynamicPath).map(Self.init)
     }
 }

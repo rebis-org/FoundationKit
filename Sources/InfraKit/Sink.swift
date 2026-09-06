@@ -26,7 +26,7 @@ public extension Sink {
     func map<T: Sendable>(_ transform: @escaping @Sendable (T) -> Element) -> some Sink<
         T,
     > {
-        MapSink(sink: self, transform: transform)
+        contramap(transform)
     }
 
     @preconcurrency

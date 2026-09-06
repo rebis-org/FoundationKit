@@ -26,10 +26,8 @@ public extension Item {
         using volume: some Volume = FoundationVolume(),
     ) throws -> Path {
         let destinationPath = Path(destination)
-        if overwrite, let kind = volume.type(at: destinationPath), kind != .directory,
-           volume.type(at: Path(self)) != .directory
-        {
-            try volume.delete(at: destinationPath)
+        if overwrite, volume.type(at: Path(self)) != .directory {
+            try removeForOverwrite(at: destinationPath, using: volume)
         }
         try volume.copy(from: Path(self), to: destinationPath)
         return destinationPath
@@ -40,12 +38,10 @@ public extension Item {
         using volume: some Volume = FoundationVolume(),
     ) throws -> Path {
         let directoryPath = Path(directory)
-        if !volume.exists(at: directoryPath) {
-            try volume.createDirectory(at: directoryPath, createIntermediateDirectories: true)
-        }
+        try ensureDirectory(at: directoryPath, using: volume)
         let result = directoryPath / baseName()
-        if overwrite, let kind = volume.type(at: result), kind != .directory {
-            try volume.delete(at: result)
+        if overwrite {
+            try removeForOverwrite(at: result, using: volume)
         }
         try volume.copy(from: Path(self), to: result)
         return result
@@ -56,8 +52,8 @@ public extension Item {
         using volume: some Volume = FoundationVolume(),
     ) throws -> Path {
         let destinationPath = Path(destination)
-        if overwrite, let kind = volume.type(at: destinationPath), kind != .directory {
-            try volume.delete(at: destinationPath)
+        if overwrite {
+            try removeForOverwrite(at: destinationPath, using: volume)
         }
         try volume.move(from: Path(self), to: destinationPath)
         return destinationPath
@@ -68,17 +64,15 @@ public extension Item {
         using volume: some Volume = FoundationVolume(),
     ) throws -> Path {
         let directoryPath = Path(directory)
-        if !volume.exists(at: directoryPath) {
-            try volume.createDirectory(at: directoryPath, createIntermediateDirectories: true)
-        }
+        try ensureDirectory(at: directoryPath, using: volume)
         guard volume.type(at: directoryPath) == .directory else {
             throw FileSystemError.copyFailed(
                 path: directoryPath.string, underlying: CocoaError.error(.fileWriteFileExists),
             )
         }
         let result = directoryPath / baseName()
-        if overwrite, let kind = volume.type(at: result), kind != .directory {
-            try volume.delete(at: result)
+        if overwrite {
+            try removeForOverwrite(at: result, using: volume)
         }
         try volume.move(from: Path(self), to: result)
         return result
@@ -220,12 +214,24 @@ public enum ListDirectoryOption: Sendable {
     case includeHidden, includeHiddenUnsorted, unsorted
 }
 
+private func ensureDirectory(at path: Path, using volume: some Volume) throws {
+    if !volume.exists(at: path) {
+        try volume.createDirectory(at: path, createIntermediateDirectories: true)
+    }
+}
+
+private func removeForOverwrite(at path: Path, using volume: some Volume) throws {
+    if let kind = volume.type(at: path), kind != .directory {
+        try volume.delete(at: path)
+    }
+}
+
 public extension [Path] {
     var directories: [Path] {
         filter(\.isDirectory)
     }
 
     var files: [Path] {
-        filter { $0.type() == .file || $0.type() == .symlink }
+        filter { [.file, .symlink].contains($0.type()) }
     }
 }

@@ -22,14 +22,11 @@ public extension LogSource {
                 query.startEpochSeconds.map { store.position(date: Date(timeIntervalSince1970: $0)) }
                     ?? store.position(timeIntervalSinceLatestBoot: 0)
 
-            var predicates: [NSPredicate] = []
-            if let identity = query.identity {
-                predicates.append(NSPredicate(format: "subsystem == %@", identity.subsystem))
-                predicates.append(NSPredicate(format: "category == %@", identity.category))
-            }
-            if let level = query.level {
-                predicates.append(NSPredicate(format: "messageType == %@", level.messageType))
-            }
+            let predicates = [
+                query.identity.map { NSPredicate(format: "subsystem == %@", $0.subsystem) },
+                query.identity.map { NSPredicate(format: "category == %@", $0.category) },
+                query.level.map { NSPredicate(format: "messageType == %@", $0.messageType) },
+            ].compactMap(\.self)
             let predicate =
                 predicates.isEmpty ? nil : NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
 

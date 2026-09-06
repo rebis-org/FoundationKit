@@ -2,7 +2,6 @@
     import CoreFoundation
     import Foundation
 
-    /// SkyLight isolates the private SkyLight C API loading and symbol resolution.
     final class SkyLight: @unchecked Sendable {
         typealias ConnectionID = @convention(c) () -> Int32
         typealias SpaceCreate = @convention(c) (Int32, Int32, Int32) -> Int32

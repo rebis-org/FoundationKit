@@ -54,7 +54,7 @@
             if options.followSymlinks {
                 emitError(
                     .invalidConfiguration(
-                        "FSEvents cannot follow symbolic links to directories. Use DispatchSource instead.",
+                        "fsevents backend cannot follow symbolic links to directories; use dispatch source instead",
                     ),
                 )
             }
@@ -177,7 +177,7 @@
         private func makeEvent(path: String, flags: FSEventStreamEventFlags, eventID: UInt64)
             -> FileSystemEvent
         {
-            let url = URL(fileURLWithPath: path).standardizedFileURL
+            let url = URL(filePath: path, directoryHint: .checkFileSystem).standardizedFileURL
             return FileSystemEvent(
                 url: url,
                 change: eventChange(for: flags),
@@ -286,16 +286,6 @@
 
         private func canonicalPath(_ url: URL) -> String {
             url.resolvingSymlinksInPath().standardizedFileURL.path
-        }
-
-        private func matchesGlobPattern(name: String, pattern: String) -> Bool {
-            var regexPattern =
-                pattern
-                    .replacingOccurrences(of: ".", with: "\\.")
-                    .replacingOccurrences(of: "*", with: ".*")
-                    .replacingOccurrences(of: "?", with: ".")
-            regexPattern = "^" + regexPattern + "$"
-            return name.range(of: regexPattern, options: .regularExpression) != nil
         }
 
         private func enqueueFSEvents(_ directories: Set<URL>, fileEvents: [FileSystemEvent]) {

@@ -20,7 +20,7 @@ public struct NDJSONSink: ~Copyable {
 
     public func write(_ line: NDJSONLine) throws {
         var data = try encoder.encode(line)
-        data.append(contentsOf: [UInt8(ascii: "\n")])
+        data.append(0x0A)
         try sink.write(data)
     }
 

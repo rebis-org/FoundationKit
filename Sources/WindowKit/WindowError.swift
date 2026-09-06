@@ -1,5 +1,6 @@
 #if os(macOS)
     public import Foundation
+    import ErrKit
 
     public enum WindowError: Error, LocalizedError {
         case frameworkUnavailable
@@ -13,25 +14,25 @@
         public var errorDescription: String? {
             switch self {
             case .frameworkUnavailable:
-                "The SkyLight framework is unavailable"
+                failure("load SkyLight framework")
 
             case .symbolMissing:
-                "A required SkyLight symbol is missing"
+                failure("find SkyLight symbol")
 
             case .spaceCreationFailed:
-                "Failed to create a window space"
+                failure("create window space")
 
             case .spaceLevelConfigurationFailed:
-                "Failed to configure the window space level"
+                failure("configure window space level")
 
             case .spaceVisibilityFailed:
-                "Failed to make the window space visible"
+                failure("show window space")
 
             case .windowCreationFailed:
-                "Failed to create the overlay window"
+                failure("create overlay window")
 
             case .elevationFailed:
-                "Failed to elevate the window to the requested level"
+                failure("elevate window to requested level")
             }
         }
     }

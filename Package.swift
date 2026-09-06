@@ -8,7 +8,6 @@ private enum Constants {
         .treatAllWarnings(as: .error),
         .strictMemorySafety(),
         .enableExperimentalFeature("AccessLevelOnImport"),
-        .enableUpcomingFeature("StrictConcurrency"),
         .enableUpcomingFeature("ExistentialAny"),
         .enableUpcomingFeature("InternalImportsByDefault"),
     ]
@@ -46,7 +45,7 @@ let package = Package(
             url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.5.0",
         ),
         .package(
-            url: "https://github.com/OpenSwiftUIProject/OpenSwiftUI-spm.git", from: "0.20.1",
+            url: "https://github.com/OpenSwiftUIProject/OpenSwiftUI-spm.git", from: "0.21.0",
         ),
     ],
     targets: [

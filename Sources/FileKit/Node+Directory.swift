@@ -2,22 +2,24 @@ public import Foundation
 public import PathKit
 
 public extension Node where Kind == DirectoryKind {
+    private static func unchecked(_ path: some Item) -> Directory {
+        try! Directory(path: path, volume: FoundationVolume())
+    }
+
     static var current: Directory {
-        try! Directory(
-            path: Path(string: FileManager.default.currentDirectoryPath), volume: FoundationVolume(),
-        )
+        unchecked(Path(string: FileManager.default.currentDirectoryPath))
     }
 
     static var root: Directory {
-        try! Directory(path: Path(string: "/"), volume: FoundationVolume())
+        unchecked(Path(string: "/"))
     }
 
     static var home: Directory {
-        try! Directory(path: Path.home, volume: FoundationVolume())
+        unchecked(Path.home)
     }
 
     static var temporary: Directory {
-        try! Directory(path: Path(string: NSTemporaryDirectory()), volume: FoundationVolume())
+        unchecked(Path(string: NSTemporaryDirectory()))
     }
 
     func subdirectory(at path: String) throws -> Directory {

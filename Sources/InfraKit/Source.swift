@@ -105,6 +105,10 @@ private struct CompactMapSource<Upstream: Source, Output: Sendable>: Source {
     }
 }
 
+private func clamped(_ count: Int) -> Locked<Int> {
+    Locked(max(0, count))
+}
+
 private final class TakeSource<Upstream: Source>: Source {
     typealias Element = Upstream.Element
 
@@ -113,7 +117,7 @@ private final class TakeSource<Upstream: Source>: Source {
 
     init(source: Upstream, count: Int) {
         self.source = source
-        remaining = Locked(max(0, count))
+        remaining = clamped(count)
     }
 
     func next() -> Upstream.Element? {
@@ -133,7 +137,7 @@ private final class DropSource<Upstream: Source>: Source {
 
     init(source: Upstream, count: Int) {
         self.source = source
-        remaining = Locked(max(0, count))
+        remaining = clamped(count)
     }
 
     func next() -> Upstream.Element? {

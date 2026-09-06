@@ -28,7 +28,7 @@
             } catch {
                 let log = ErrLog<OSLogSink>(identity: Identity(subsystem: "dev.rebis.WindowKit", category: "window"))
                 log.log(error)
-                fatalError("SkyLight is unavailable: \(error)")
+                fatalError(failure("use SkyLight", because: error))
             }
         }()
 

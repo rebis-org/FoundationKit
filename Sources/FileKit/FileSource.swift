@@ -1,10 +1,9 @@
 public import Foundation
-public import InfraKit
 
-/// The closed flag is guarded by Locked; FileHandle is Sendable on these platforms.
+/// FileHandle is Sendable on these platforms, so only the closed flag needs guarding.
 public struct FileSource: ~Copyable, Sendable {
     private let handle: FileHandle
-    private let closed: Locked<Bool>
+    private let closed = FileCloseGuard()
 
     public init(file: File) throws {
         do {
@@ -12,12 +11,11 @@ public struct FileSource: ~Copyable, Sendable {
         } catch {
             throw FileSystemError.readFailed(path: file.path.string, underlying: error)
         }
-        closed = Locked(false)
     }
 
     public func read() throws -> Data {
-        guard !closed.withLock({ $0 }) else {
-            throw FileSystemError.readFailed(path: "", underlying: SourceError.alreadyClosed)
+        guard !closed.isClosed else {
+            throw FileSystemError.readFailed(path: "", underlying: FileHandleError.alreadyClosed)
         }
         return handle.readDataToEndOfFile()
     }
@@ -30,22 +28,13 @@ public struct FileSource: ~Copyable, Sendable {
     }
 
     public consuming func close() throws {
-        let wasClosed = closed.withLock { closed in
-            let previous = closed
-            closed = true
-            return previous
-        }
-        guard !wasClosed else { return }
+        guard closed.claim() else { return }
         try handle.close()
     }
 
     deinit {
-        if !closed.withLock({ $0 }) {
+        if !closed.isClosed {
             try? handle.close()
         }
     }
-}
-
-private enum SourceError: Error {
-    case alreadyClosed
 }

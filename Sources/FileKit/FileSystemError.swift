@@ -30,45 +30,41 @@ public enum FileSystemError: Error, LocalizedError {
 
     public var errorDescription: String? {
         switch self {
-        case let .pathNotFound(path): "Path not found: \(path)"
-        case .emptyFilePath: "The file path is empty"
-        case .cannotRenameRoot: "Cannot rename the file-system root"
-
-        case let .renameFailed(path, error):
-            "Failed to rename '\(path)': \(error.localizedDescription)"
-
-        case let .moveFailed(path, error): "Failed to move '\(path)': \(error.localizedDescription)"
-        case let .copyFailed(path, error): "Failed to copy '\(path)': \(error.localizedDescription)"
-
-        case let .deleteFailed(path, error):
-            "Failed to delete '\(path)': \(error.localizedDescription)"
+        case let .pathNotFound(path): failure("find path", path)
+        case .emptyFilePath: failure("use empty file path")
+        case .cannotRenameRoot: failure("rename file-system root")
+        case let .renameFailed(path, error): failure("rename", path, because: error)
+        case let .moveFailed(path, error): failure("move", path, because: error)
+        case let .copyFailed(path, error): failure("copy", path, because: error)
+        case let .deleteFailed(path, error): failure("delete", path, because: error)
 
         case let .unresolvedSearchPath(searchPath, domain):
-            "Cannot resolve search path \(searchPath) in domain \(domain)"
+            failure("resolve search path \(searchPath) in domain \(domain)")
 
-        case .emptyWritePath: "The write path is empty"
+        case .emptyWritePath: failure("write to empty path")
+        case let .directoryCreationFailed(path, error): failure("create directory", path, because: error)
+        case let .fileCreationFailed(path): failure("create file", path)
+        case let .writeFailed(path, error): failure("write", path, because: error)
+        case let .stringEncodingFailed(string): failure("encode string", string)
+        case let .readFailed(path, error): failure("read", path, because: error)
+        case let .stringDecodingFailed(path): failure("decode string at", path)
+        case let .notAnInt(path, value): failure("parse integer from", path, because: "'\(value)'")
+        case let .cannotOpenDirectory(url): failure("open directory", url.path)
 
-        case let .directoryCreationFailed(path, error):
-            "Failed to create directory '\(path)': \(error.localizedDescription)"
+        case let .insufficientPermissions(url):
+            failure("watch", url.path, because: "insufficient permissions")
 
-        case let .fileCreationFailed(path): "Failed to create file '\(path)'"
+        case let .directoryNotFound(url): failure("find directory", url.path)
 
-        case let .writeFailed(path, error):
-            "Failed to write '\(path)': \(error.localizedDescription)"
+        case .systemResourcesUnavailable:
+            failure("allocate system resources", because: "unavailable for file-system watching")
 
-        case let .stringEncodingFailed(string): "Failed to encode string: \(string)"
-        case let .readFailed(path, error): "Failed to read '\(path)': \(error.localizedDescription)"
-        case let .stringDecodingFailed(path): "Failed to decode string at '\(path)'"
-        case let .notAnInt(path, value): "File '\(path)' does not contain an integer: '\(value)'"
-        case let .cannotOpenDirectory(url): "Cannot open directory at \(url.path)"
-        case let .insufficientPermissions(url): "Insufficient permissions to watch \(url.path)"
-        case let .directoryNotFound(url): "Directory not found at \(url.path)"
-        case .systemResourcesUnavailable: "System resources unavailable for file-system watching"
-        case let .invalidConfiguration(message): "Invalid watcher option: \(message)"
-        case let .tooManyWatchers(limit): "Reached the maximum number of watched directories (\(limit))"
+        case let .invalidConfiguration(message): failure("configure watcher", because: message)
 
-        case let .failedToWatch(url, error):
-            "Failed to watch \(url.path): \(error.localizedDescription)"
+        case let .tooManyWatchers(limit):
+            failure("watch directory", because: "maximum \(limit) watched directories reached")
+
+        case let .failedToWatch(url, error): failure("watch", url.path, because: error)
         }
     }
 

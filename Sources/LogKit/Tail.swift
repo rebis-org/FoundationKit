@@ -1,6 +1,11 @@
 import Foundation
+import InfraKit
 
-struct Tail: Encodable {
+/// JSONEncoder init is expensive; one shared instance behind a lock
+/// beats allocating per log line. Output is identical to a fresh encoder.
+private let sharedEncoder = Locked(JSONEncoder())
+
+struct Tail: Encodable, Sendable {
     private static let marker = " [LogKit:v1] "
 
     let file: String
@@ -46,7 +51,8 @@ struct Tail: Encodable {
     }
 
     func encoded() -> String {
-        guard let data = try? JSONEncoder().encode(self), let json = String(data: data, encoding: .utf8)
+        guard let data = try? sharedEncoder.withLock({ try $0.encode(self) }),
+              let json = String(data: data, encoding: .utf8)
         else { return "" }
         return Self.marker + json
     }
