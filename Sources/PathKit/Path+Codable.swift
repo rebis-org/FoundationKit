@@ -1,0 +1,42 @@
+import Foundation
+
+extension CodingUserInfoKey {
+    public static let relativePath: CodingUserInfoKey = {
+        guard let key = CodingUserInfoKey(rawValue: "dev.rebis.Path.relative") else {
+            fatalError("Cannot create the relative-path coding key")
+        }
+        return key
+    }()
+}
+
+extension Path: Codable {
+    public init(from decoder: any Decoder) throws {
+        let value = try decoder.singleValueContainer().decode(String.self)
+        if value.hasPrefix("/") {
+            string = value
+        } else if let root = Self.relativeRoot(from: decoder.userInfo) {
+            string = (root / value).string
+        } else {
+            throw DecodingError.dataCorrupted(
+                .init(
+                    codingPath: [],
+                    debugDescription: "Cannot decode a relative path without CodingUserInfoKey.relativePath.",
+                ),
+            )
+        }
+    }
+
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        if let root = Self.relativeRoot(from: encoder.userInfo) {
+            try container.encode(relative(to: root))
+        } else {
+            try container.encode(string)
+        }
+    }
+
+    private static func relativeRoot(from userInfo: [CodingUserInfoKey: Any]) -> Path? {
+        (userInfo[.relativePath] as? Path)
+            ?? (userInfo[.relativePath] as? DynamicPath).map(Self.init)
+    }
+}
