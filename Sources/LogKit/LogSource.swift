@@ -1,0 +1,59 @@
+import Foundation
+import OSLog
+
+public struct LogSource: Sendable {
+    public typealias Entries = @Sendable (Query) async throws -> [Entry]
+
+    private let entries: Entries
+
+    public init(entries: @escaping Entries) {
+        self.entries = entries
+    }
+
+    public func entries(matching query: Query) async throws -> [Entry] {
+        try await entries(query)
+    }
+}
+
+extension LogSource {
+    public static func osLogStore() -> LogSource {
+        LogSource { query in
+            let store = try OSLogStore(scope: .currentProcessIdentifier)
+            let position =
+                query.startEpochSeconds.map { store.position(date: Date(timeIntervalSince1970: $0)) }
+                    ?? store.position(timeIntervalSinceLatestBoot: 0)
+
+            let predicates = [
+                query.identity.map { NSPredicate(format: "subsystem == %@", $0.subsystem) },
+                query.identity.map { NSPredicate(format: "category == %@", $0.category) },
+                query.level.map { NSPredicate(format: "messageType == %@", $0.messageType) },
+            ].compactMap(\.self)
+            let predicate =
+                predicates.isEmpty ? nil : NSCompoundPredicate(andPredicateWithSubpredicates: predicates)
+
+            var result: [Entry] = []
+            result.reserveCapacity(min(query.maximumEntries, 1_024))
+
+            for entry in try store.getEntries(at: position, matching: predicate) {
+                try Task.checkCancellation()
+                guard result.count < query.maximumEntries else { break }
+                guard let log = entry as? OSLogEntryLog else { continue }
+
+                if let end = query.endEpochSeconds, log.date.timeIntervalSince1970 > end {
+                    break
+                }
+                result.append(
+                    Entry(
+                        epochSeconds: log.date.timeIntervalSince1970,
+                        identity: Identity(subsystem: log.subsystem, category: log.category),
+                        level: Level(osLogLevel: log.level),
+                        message: log.composedMessage,
+                        process: log.process,
+                        pid: Int(log.processIdentifier),
+                    ),
+                )
+            }
+            return result
+        }
+    }
+}
